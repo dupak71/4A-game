@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>서울대 한국어 4A 2과 단어게임</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: 'Malgun Gothic', sans-serif; background: #f0fdf4; display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0; overflow: hidden; }
+    .game-container { background:#fff; padding:20px; border-radius:20px; box-shadow:0 10px 40px rgba(0,0,0,0.15); max-width:650px; width:95%; position: relative; z-index: 10; border: 2px solid #22c55e; }
+    h1 { font-size:1.3rem; margin:0 0 10px 0; text-align:center; color: #166534; }
+    .status-bar { display:flex; justify-content:space-between; margin-bottom:15px; background: #f0fdf4; padding: 10px 15px; border-radius: 12px; font-weight: 800; font-size: 1rem; }
+    #timer-display { color: #dc2626; border: 2px solid #fecaca; padding: 2px 10px; border-radius: 20px; background: #fff; min-width: 80px; text-align: center; }
+    
+    .card { background:#fffbeb; padding:25px 15px; border-radius:15px; margin-bottom:10px; border: 1px solid #fef3c7; text-align: center; }
+    .q-text { font-weight:800; color:#1e293b; min-height: 5em; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .lang-vn { font-size: 1.6rem; color: #444; margin-bottom: 8px; line-height: 1.2; }
+    /* 우즈벡어 크기 및 색상 강화 */
+    .lang-uz { font-size: 1.9rem; color: #111; line-height: 1.2; font-weight: 900; }
+
+    .hint-area { text-align: center; margin-bottom: 15px; }
+    #hint-btn { background: #f8fafc; border: 1px dashed #22c55e; color: #166534; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 700; transition: 0.2s; }
+    #hint-text { display: none; background: #e8f5e9; color: #2e7d32; padding: 12px; border-radius: 10px; margin-top: 8px; font-size: 0.95rem; font-weight: 600; border-left: 5px solid #22c55e; animation: fadeIn 0.3s; }
+
+    #options { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom: 10px; }
+    .option-btn { padding:14px 15px; border-radius:12px; border:2px solid #e2e8f0; background:#fff; cursor:pointer; font-weight: 700; font-size: 1.1rem; transition: 0.2s; color: #334155; display: flex; align-items: center; text-align: left; }
+    .opt-num { display: inline-block; background: #22c55e; color: white; width: 28px; height: 28px; line-height: 28px; text-align: center; border-radius: 50%; margin-right: 12px; font-size: 1rem; font-weight: 900; flex-shrink: 0; }
+    .option-btn.correct { background:#dcfce7 !important; border-color:#22c55e !important; color: #166534; }
+    .option-btn.wrong { background:#fee2e2 !important; border-color:#ef4444 !important; color: #991b1b; }
+    
+    #message { min-height:35px; text-align:center; margin-top:5px; font-weight: 800; font-size: 1.3rem; }
+    #controls { display:flex; gap:10px; margin-top:10px; }
+    #next-btn, #shuffle-btn { flex:1; padding:12px; border-radius:12px; border:none; cursor:pointer; color:white; font-weight: 800; font-size: 1.1rem; }
+    #next-btn { background:#22c55e; box-shadow: 0 3px 0 #16a34a; }
+    #next-btn:disabled { background: #cbd5e1; box-shadow: none; cursor: not-allowed; }
+    #shuffle-btn { background:#64748b; }
+    
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    canvas { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 999; }
+    @media (max-width: 500px) { #options { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <h1>🏥 4A 2과 '건강한 삶' (73개 단어)</h1>
+    <div class="status-bar">
+      <div>문제: <span id="q-num">0</span> / 73</div>
+      <div id="timer-display">⏱ <span id="time">15</span>초</div>
+      <div>점수: <span id="score">0</span></div>
+    </div>
+    <div class="card">
+      <div class="q-text" id="q-text">로딩 중...</div>
+    </div>
+
+    <div class="hint-area">
+      <button id="hint-btn" onclick="toggleHint()">💡 정답 힌트 보기</button>
+      <div id="hint-text"></div>
+    </div>
+
+    <div id="options"></div>
+    <div id="message"></div>
+    <div id="controls">
+      <button id="shuffle-btn">새 게임 시작</button>
+      <button id="next-btn" disabled>다음 문제 ▶</button>
+    </div>
+  </div>
+  <canvas id="canvas"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script>
+    const WORDS = [
+      {k:"눈이 침침하다", v:"mắt bị mờ", u:"ko'z xiralashmoq", h:"눈이 흐릿하게 잘 안 보이는 상태입니다."},
+      {k:"목이 뻣뻣하다", v:"cổ bị cứng", u:"bo'yin qotib qolmoq", h:"목이 부드럽게 움직이지 않고 굳은 느낌입니다."},
+      {k:"목이 따끔거리다", v:"rát cổ", u:"tomoq achishmoq", h:"목 안이 아프고 따가운 느낌입니다."},
+      {k:"속이 거북하다", v:"đầy bụng", u:"oshqozon noxush bo'lmoq", h:"소화가 안 되어 배가 불편하고 가득 찬 느낌입니다."},
+      {k:"가슴이 답답하다", v:"tức ngực", u:"siqilmoq / nafas qisishmoq", h:"숨쉬기 힘들거나 마음이 편하지 않은 상태입니다."},
+      {k:"붓다", v:"sưng, phòng", u:"shishmoq", h:"몸의 일부가 커지거나 부풀어 오르는 것입니다."},
+      {k:"쓰리다", v:"còn cào, đau nhói", u:"achishmoq / lo'killab og'rimoq", h:"상처가 났거나 위가 아플 때 따가운 느낌입니다."},
+      {k:"막히다", v:"tắc, bị chặn", u:"tiqilmoq / to'silmoq", h:"코가 막히거나 길이 통하지 않는 상태입니다."},
+      {k:"가렵다", v:"ngứa", u:"qichishmoq", h:"피부가 간지러워서 긁고 싶은 느낌입니다."},
+      {k:"저리다", v:"tê, tê buốt", u:"uvushmoq / uyushmoq", h:"피가 잘 안 통해서 팔다리가 찌릿찌릿한 느낌입니다."},
+      {k:"과로", v:"sự làm việc quá mức", u:"o'ta charchash (ishdan)", h:"일을 너무 많이 해서 몸이 몹시 피곤한 상태입니다."},
+      {k:"과식", v:"việc ăn quá nhiều", u:"ko'p yeb yubormoq", h:"음식을 너무 많이 먹는 것을 말합니다."},
+      {k:"과음", v:"việc uống quá độ", u:"ko'p ichib yubormoq", h:"술을 너무 많이 마시는 것을 말합니다."},
+      {k:"과속", v:"việc chạy quá tốc độ", u:"tezlikni oshirmoq", h:"차를 정해진 속도보다 빠르게 운전하는 것입니다."},
+      {k:"과소비", v:"việc tiêu xài quá mức", u:"isrofgarchilik", h:"돈을 너무 많이 써서 낭비하는 것을 말합니다."},
+      {k:"허리를 펴다", v:"duỗi, ưỡn thẳng lưng", u:"belni rostlamoq", h:"굽혔던 허리를 곧게 세우는 동작입니다."},
+      {k:"즐겨 입다", v:"thường mặc", u:"sevib kiymoq", h:"평소에 자주 입는 것을 말합니다."},
+      {k:"무리하다", v:"quá sức", u:"zo'riqmoq", h:"자신의 힘보다 더 힘든 일을 하는 것입니다."},
+      {k:"자꾸만", v:"cứ, tiếp tục", u:"tinmay / qayta-qayta", h:"어떤 일이 계속해서 반복되는 것을 말합니다."},
+      {k:"엄살이다", v:"giả ốm / làm quá", u:"baana qilmoq", h:"아픔이나 힘든 정도를 실제보다 크게 표현하는 것입니다."},
+      {k:"온몸", v:"toàn bộ cơ thể", u:"butun tana", h:"머리부터 발끝까지 몸 전체를 말합니다."},
+      {k:"불규칙하다", v:"bất quy tắc", u:"tartibsiz", h:"일정하지 않고 마음대로인 상태입니다."},
+      {k:"후회하다", v:"hối hận", u:"afsuslanmoq", h:"이미 한 일을 잘못했다고 생각하는 것입니다."},
+      {k:"툭하면", v:"hơi một tí, hễ một tí", u:"sal narsaga", h:"조금만 무슨 일이 있어도 곧장 일어나는 모양입니다."},
+      {k:"사람을 치다", v:"đánh người / đâm người", u:"odamni urib yubormoq", h:"사람을 때리거나 차로 부딪히는 것을 말합니다."},
+      {k:"질", v:"chất, chất lượng", u:"sifat", h:"물건이나 가치의 수준을 뜻합니다."},
+      {k:"예방하다", v:"dự phòng, phòng ngừa", u:"oldini olmoq", h:"병이나 사고가 나기 전에 미리 막는 것입니다."},
+      {k:"치료하다", v:"trị liệu, điều trị", u:"davolamoq", h:"병이나 상처를 낫게 고치는 것입니다."},
+      {k:"휴가철", v:"kì nghỉ", u:"ta'til mavsumi", h:"사람들이 보통 휴가를 많이 가는 시기입니다."},
+      {k:"패키지", v:"đồ đạc, kiện đồ / gói", u:"paket", h:"여러 상품을 하나로 묶어 놓은 것입니다."},
+      {k:"고급스럽다", v:"cao cấp", u:"hashamatli", h:"품질이 좋고 비싸 보이는 느낌입니다."},
+      {k:"약속드리다", v:"hứa hẹn", u:"va'da bermoq", h:"다른 사람과 어떤 일을 하기로 다짐하는 것입니다."},
+      {k:"특식", v:"bữa ăn đặc biệt", u:"maxsus taom", h:"평소와 다르게 특별히 준비한 음식입니다."},
+      {k:"풀코스", v:"bữa ăn đầy đủ các món", u:"to'liq kursli taom", h:"처음부터 끝까지 모든 메뉴가 나오는 식사입니다."},
+      {k:"최고급", v:"cao cấp nhất", u:"eng oliy darajali", h:"가장 품질이 높고 좋은 등급입니다."},
+      {k:"과일 바구니", v:"giỏ hoa quả", u:"meva savati", h:"과일을 담아 선물용으로 만든 바구니입니다."},
+      {k:"증정", v:"sự tặng", u:"sovg'a qilish", h:"물건을 공짜로 주는 것을 말합니다."},
+      {k:"명상", v:"sự thiền", u:"meditatsiya", h:"마음을 가라앉히고 깊이 생각하는 일입니다."},
+      {k:"사찰", v:"chùa", u:"ibodatxona", h:"절을 뜻하는 다른 말입니다."},
+      {k:"잡곡밥", v:"cơm ngũ cốc", u:"aralash donli guruch", h:"여러 가지 곡물을 섞어서 지은 밥입니다."},
+      {k:"건강식", v:"đồ ăn tốt cho sức khỏe", u:"sog'lom taom", h:"건강에 좋은 재료로 만든 음식입니다."},
+      {k:"버섯", v:"nấm", u:"qo'ziqorin", h:"나무나 땅에서 자라는 식용 식물입니다."},
+      {k:"경고", v:"sự cảnh cáo", u:"ogohlantirish", h:"주의하라고 미리 알려주는 것입니다."},
+      {k:"지나치다", v:"quá, thái quá", u:"haddan patriari", h:"정도를 넘어서 너무 심한 것을 뜻합니다."},
+      {k:"폐암", v:"ung thư phổi", u:"o'pka saratoni", h:"폐에 생기는 나쁜 병입니다."},
+      {k:"각종", v:"nhiều loại, các loại", u:"turli xil", h:"여러 가지 종류를 뜻합니다."},
+      {k:"질병", v:"bệnh tật", u:"kasallik", h:"몸에 생기는 병을 통틀어 이르는 말입니다."},
+      {k:"병들다", v:"bị bệnh", u:"kasal bo'lmoq", h:"병이 생겨서 몸이 아프게 되는 것입니다."},
+      {k:"간암", v:"ung thư gan", u:"jigar saratoni", h:"간에 생기는 무서운 병입니다."},
+      {k:"음주", v:"việc uống đồ có còn", u:"spirtli ichimlik ichish", h:"술을 마시는 행위를 말합니다."},
+      {k:"작업", v:"công việc", u:"ish / mehnat", h:"어떤 일을 완성하기 위해 하는 노동입니다."},
+      {k:"발생률", v:"tỉ lệ phát sinh", u:"chiqish darajasi", h:"어떤 일이 일어나는 비율입니다."},
+      {k:"알코올 중독", v:"nghiện rượu", u:"alkogolizm", h:"술을 끊지 못하고 계속 마시는 병입니다."},
+      {k:"유발하다", v:"tạo ra, phát ra", u:"keltirib chiqarmoq", h:"어떤 사건이나 병을 일어나게 만드는 것입니다."},
+      {k:"숨을 쉬다", v:"thở", u:"nafas olmoq", h:"코나 입으로 공기를 들이마시고 내뱉는 것입니다."},
+      {k:"딱 질색이다", v:"ghét, chán ghét", u:"juda yomon ko'rmoq", h:"어떤 것을 아주 많이 싫어할 때 쓰는 표현입니다."},
+      {k:"뚝 떨어지다", v:"rơi tuột xuống", u:"birdan tushib ketmoq", h:"갑자기 아래로 내려가거나 낮아지는 것입니다."},
+      {k:"빙글빙글 돌다", v:"quay tít, quay tròn", u:"aylanmoq", h:"제자리에서 계속 도는 모양입니다."},
+      {k:"먼지", v:"bụi", u:"chang", h:"공중에 떠다니는 아주 작은 가루입니다."},
+      {k:"꽃가루가 날리다", v:"phấn hoa bay", u:"gul changi uchishi", h:"꽃의 가루가 바람에 흩날리는 것입니다."},
+      {k:"삐다", v:"trẹo, trật khớp", u:"chiqarmoq", h:"발목이나 손목의 뼈가 어긋나는 상처를 입는 것입니다."},
+      {k:"멍이 들다", v:"có vết bầm", u:"ko'karmoq", h:"부딪쳐서 피부 속의 피가 뭉쳐 푸르게 되는 것입니다."},
+      {k:"확인하다", v:"kiểm tra", u:"tasdiqlamoq", h:"틀림없는지 다시 알아보는 것입니다."},
+      {k:"누르다", v:"ấn", u:"bosmoq", h:"손가락 등으로 힘을 가해 누르는 동작입니다."},
+      {k:"뼈", v:"xương", u:"suyak", h:"사람의 몸을 지탱하는 딱딱한 부분입니다."},
+      {k:"검사하다", v:"kiểm tra", u:"tekshirmoq", h:"상태를 조사하여 알아보는 것입니다."},
+      {k:"붕대를 감다", v:"băng bó", u:"bog'lamoq", h:"상처 부위를 헝겊 띠로 싸매는 것입니다."},
+      {k:"깁스를 하다", v:"bó bột", u:"gips qilmoq", h:"부러진 뼈를 고정하기 위해 석고를 바르는 것입니다."},
+      {k:"한의원", v:"viện y học cổ truyền", u:"an'anaviy tibbiyot", h:"침을 맞거나 한약을 짓는 병원입니다."},
+      {k:"침을 놓다", v:"châm cứu", u:"igna sanchmoq", h:"가느다란 바늘을 몸의 혈 자리에 찌르는 치료입니다."},
+      {k:"얼음찜질", v:"chườm đá", u:"muzli muolaja", h:"부은 곳에 얼음을 대어 열을 식히는 것입니다."},
+      {k:"생강", v:"gừng", u:"zanjabil", h:"매운맛이 나며 감기에 좋은 뿌리 식물입니다."},
+      {k:"반죽", v:"việc nhào, việc nặn", u:"xamir", h:"가루에 물을 섞어 주물러서 만든 덩어리입니다."}
+    ];
+
+    let current = 0, score = 0, timer, timeLeft = 15, shuffledList = [];
+    
+    const sndFanfare = new Audio('https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3'); 
+    const sndFirework = new Audio('https://assets.mixkit.co/active_storage/sfx/2020/2020-preview.mp3'); 
+    const sndWrong = new Audio('https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3'); 
+
+    function shuffle(arr) { return arr.sort(() => Math.random() - 0.5); }
+    
+    function toggleHint() {
+      const hText = document.getElementById('hint-text');
+      hText.style.display = (hText.style.display === 'block') ? 'none' : 'block';
+    }
+
+    async function playAudio(audio) {
+      try { audio.currentTime = 0; await audio.play(); } catch(e) { console.log("Sound interaction blocked"); }
+    }
+
+    function runEvent(type, repeatCount) {
+      if (type === 'fanfare') {
+        playAudio(sndFanfare);
+        let i = 0;
+        const intr = setInterval(() => {
+          confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, gravity: 0.8 });
+          i++; if (i >= repeatCount) clearInterval(intr);
+        }, 1200);
+      } else if (type === 'firework') {
+        playAudio(sndFirework);
+        let i = 0;
+        const intr = setInterval(() => {
+          const end = Date.now() + 1500;
+          (function frame() {
+            confetti({ particleCount: 80, startVelocity: 40, spread: 360, origin: { x: Math.random(), y: Math.random() - 0.2 } });
+            if (Date.now() < end) requestAnimationFrame(frame);
+          }());
+          i++; if (i >= repeatCount) clearInterval(intr);
+        }, 2000);
+      }
+    }
+
+    function startTimer() {
+      clearInterval(timer); timeLeft = 15; document.getElementById('time').textContent = timeLeft;
+      timer = setInterval(() => {
+        timeLeft--; document.getElementById('time').textContent = timeLeft;
+        if (timeLeft <= 0) { clearInterval(timer); checkAnswer(null, shuffledList[current].k); }
+      }, 1000);
+    }
+
+    function loadQuestion() {
+      if (current >= shuffledList.length) { 
+        document.getElementById('q-text').innerHTML = "🎊 완벽합니다! 모든 단어를 맞혔습니다!"; 
+        document.getElementById('options').innerHTML = ""; 
+        document.querySelector('.hint-area').style.display = 'none';
+        return; 
+      }
+      document.getElementById('hint-text').style.display = 'none';
+      document.getElementById('next-btn').disabled = true; 
+      document.getElementById('message').textContent = ""; 
+      document.getElementById('q-num').textContent = current + 1;
+      
+      const word = shuffledList[current];
+      // 문제 영역에 우즈벡어 표시
+      document.getElementById('q-text').innerHTML = `
+        <div class="lang-vn">${word.v}</div>
+        <div class="lang-uz">${word.u}</div>
+      `;
+      document.getElementById('hint-text').textContent = "💡 힌트: " + word.h;
+
+      const wrongs = shuffle(WORDS.filter(w => w.k !== word.k)).slice(0, 3).map(w => w.k);
+      const choices = shuffle([word.k, ...wrongs]);
+      
+      const optDiv = document.getElementById('options'); optDiv.innerHTML = "";
+      choices.forEach((c, i) => { 
+        const btn = document.createElement('button'); 
+        btn.className = "option-btn"; 
+        btn.innerHTML = `<span class="opt-num">${i + 1}</span> ${c}`; 
+        btn.onclick = () => checkAnswer(c, word.k, btn); 
+        optDiv.appendChild(btn); 
+      });
+      startTimer();
+    }
+
+    function checkAnswer(selected, correct, btn) {
+      clearInterval(timer); 
+      document.querySelectorAll('.option-btn').forEach(b => b.disabled = true); 
+      document.getElementById('next-btn').disabled = false;
+      
+      if (selected === correct) {
+        btn.classList.add('correct'); 
+        document.getElementById('message').textContent = "정답입니다! 😊"; 
+        score++; 
+        document.getElementById('score').textContent = score;
+
+        if (score === 15) {
+          runEvent('fanfare', 1);
+        } else if (score === 30) {
+          runEvent('fanfare', 2);
+        } else if (score === 73) {
+          runEvent('firework', 2);
+        }
+      } else {
+        if(btn) btn.classList.add('wrong'); 
+        document.getElementById('message').textContent = "오답입니다! 정답: " + correct; 
+        playAudio(sndWrong);
+        document.querySelectorAll('.option-btn').forEach(b => { 
+          if(b.textContent.includes(correct)) b.classList.add('correct'); 
+        });
+        document.getElementById('hint-text').style.display = 'block'; 
+      }
+    }
+
+    document.getElementById('next-btn').onclick = () => { current++; loadQuestion(); };
+    document.getElementById('shuffle-btn').onclick = () => { 
+      if(confirm("게임을 초기화하시겠습니까?")) { 
+        current = 0; score = 0; 
+        document.getElementById('score').textContent = score; 
+        shuffledList = shuffle([...WORDS]); 
+        loadQuestion(); 
+      } 
+    };
+
+    shuffledList = shuffle([...WORDS]); 
+    loadQuestion();
+  </script>
+</body>
+</html>
